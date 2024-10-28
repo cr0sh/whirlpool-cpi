@@ -1,8 +1,10 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount};
 use anchor_spl::associated_token::AssociatedToken;
+use anchor_spl::token::{self, Token, TokenAccount};
+use anchor_spl::token_interface::{self, Mint, TokenInterface};
 use solana_program::pubkey;
 
+use crate::memo::Memo;
 use crate::state::*;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -11,7 +13,6 @@ use crate::state::*;
 const WPB_NFT_UPDATE_AUTH: Pubkey = pubkey!("3axbTs2z5GBy6usVbNVoqEgZMng3vZvMnAoX29BFfwhr");
 const WP_NFT_UPDATE_AUTH: Pubkey = pubkey!("3axbTs2z5GBy6usVbNVoqEgZMng3vZvMnAoX29BFfwhr");
 const METADATA_PROGRAM_ID: Pubkey = pubkey!("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
-
 ////////////////////////////////////////////////////////////////////////////////
 // Context
 ////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +63,7 @@ pub struct ClosePosition<'info> {
     pub position: Account<'info, Position>,
 
     #[account(mut, address = position.position_mint)]
-    pub position_mint: Account<'info, Mint>,
+    pub position_mint: Account<'info, token::Mint>,
 
     #[account(mut,
         constraint = position_token_account.amount == 1,
@@ -160,7 +161,7 @@ pub struct DeletePositionBundle<'info> {
     pub position_bundle: Account<'info, PositionBundle>,
 
     #[account(mut, address = position_bundle.position_bundle_mint)]
-    pub position_bundle_mint: Account<'info, Mint>,
+    pub position_bundle_mint: Account<'info, token::Mint>,
 
     #[account(mut,
         constraint = position_bundle_token_account.mint == position_bundle.position_bundle_mint,
@@ -251,8 +252,8 @@ pub struct InitializeFeeTier<'info> {
 pub struct InitializePool<'info> {
     pub whirlpools_config: Box<Account<'info, WhirlpoolsConfig>>,
 
-    pub token_mint_a: Account<'info, Mint>,
-    pub token_mint_b: Account<'info, Mint>,
+    pub token_mint_a: Account<'info, token::Mint>,
+    pub token_mint_b: Account<'info, token::Mint>,
 
     #[account(mut)]
     pub funder: Signer<'info>,
@@ -306,7 +307,7 @@ pub struct InitializePositionBundle<'info> {
         mint::authority = position_bundle, // will be removed in the transaction
         mint::decimals = 0,
     )]
-    pub position_bundle_mint: Account<'info, Mint>,
+    pub position_bundle_mint: Account<'info, token::Mint>,
 
     #[account(init,
         payer = funder,
@@ -343,7 +344,7 @@ pub struct InitializePositionBundleWithMetadata<'info> {
         mint::authority = position_bundle, // will be removed in the transaction
         mint::decimals = 0,
     )]
-    pub position_bundle_mint: Account<'info, Mint>,
+    pub position_bundle_mint: Account<'info, token::Mint>,
 
     /// CHECK: checked via the Metadata CPI call
     /// https://github.com/metaplex-foundation/metaplex-program-library/blob/773a574c4b34e5b9f248a81306ec24db064e255f/token-metadata/program/src/utils/metadata.rs#L100
@@ -390,7 +391,7 @@ pub struct InitializeReward<'info> {
     #[account(mut)]
     pub whirlpool: Box<Account<'info, Whirlpool>>,
 
-    pub reward_mint: Box<Account<'info, Mint>>,
+    pub reward_mint: Box<Account<'info, token::Mint>>,
 
     #[account(
         init,
@@ -481,7 +482,7 @@ pub struct OpenPosition<'info> {
         mint::authority = whirlpool,
         mint::decimals = 0,
     )]
-    pub position_mint: Account<'info, Mint>,
+    pub position_mint: Account<'info, token::Mint>,
 
     #[account(init,
       payer = funder,
@@ -520,7 +521,7 @@ pub struct OpenPositionWithMetadata<'info> {
         mint::authority = whirlpool,
         mint::decimals = 0,
     )]
-    pub position_mint: Account<'info, Mint>,
+    pub position_mint: Account<'info, token::Mint>,
 
     /// CHECK: checked via the Metadata CPI call
     /// https://github.com/metaplex-foundation/metaplex-program-library/blob/master/token-metadata/program/src/utils.rs#L873
@@ -808,19 +809,19 @@ pub struct CollectFeesV2<'info> {
     pub position_token_account: Box<Account<'info, token::TokenAccount>>,
 
     #[account(address = whirlpool.token_mint_a)]
-    pub token_mint_a: InterfaceAccount<'info, Mint>,
+    pub token_mint_a: InterfaceAccount<'info, token_interface::Mint>,
     #[account(address = whirlpool.token_mint_b)]
-    pub token_mint_b: InterfaceAccount<'info, Mint>,
+    pub token_mint_b: InterfaceAccount<'info, token_interface::Mint>,
 
     #[account(mut, constraint = token_owner_account_a.mint == whirlpool.token_mint_a)]
-    pub token_owner_account_a: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub token_owner_account_a: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
     #[account(mut, address = whirlpool.token_vault_a)]
-    pub token_vault_a: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub token_vault_a: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
 
     #[account(mut, constraint = token_owner_account_b.mint == whirlpool.token_mint_b)]
-    pub token_owner_account_b: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub token_owner_account_b: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
     #[account(mut, address = whirlpool.token_vault_b)]
-    pub token_vault_b: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub token_vault_b: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
 
     #[account(address = *token_mint_a.to_account_info().owner)]
     pub token_program_a: Interface<'info, TokenInterface>,
@@ -848,16 +849,16 @@ pub struct CollectProtocolFeesV2<'info> {
     pub token_mint_b: InterfaceAccount<'info, Mint>,
 
     #[account(mut, address = whirlpool.token_vault_a)]
-    pub token_vault_a: InterfaceAccount<'info, TokenAccount>,
+    pub token_vault_a: InterfaceAccount<'info, token_interface::TokenAccount>,
 
     #[account(mut, address = whirlpool.token_vault_b)]
-    pub token_vault_b: InterfaceAccount<'info, TokenAccount>,
+    pub token_vault_b: InterfaceAccount<'info, token_interface::TokenAccount>,
 
     #[account(mut, constraint = token_destination_a.mint == whirlpool.token_mint_a)]
-    pub token_destination_a: InterfaceAccount<'info, TokenAccount>,
+    pub token_destination_a: InterfaceAccount<'info, token_interface::TokenAccount>,
 
     #[account(mut, constraint = token_destination_b.mint == whirlpool.token_mint_b)]
-    pub token_destination_b: InterfaceAccount<'info, TokenAccount>,
+    pub token_destination_b: InterfaceAccount<'info, token_interface::TokenAccount>,
 
     #[account(address = *token_mint_a.to_account_info().owner)]
     pub token_program_a: Interface<'info, TokenInterface>,
@@ -882,21 +883,21 @@ pub struct CollectRewardV2<'info> {
         constraint = position_token_account.mint == position.position_mint,
         constraint = position_token_account.amount == 1
     )]
-    pub position_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub position_token_account: Box<Account<'info, TokenAccount>>,
 
     #[account(mut,
         constraint = reward_owner_account.mint == whirlpool.reward_infos[reward_index as usize].mint
     )]
-    pub reward_owner_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub reward_owner_account: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
 
     #[account(address = whirlpool.reward_infos[reward_index as usize].mint)]
     pub reward_mint: Box<InterfaceAccount<'info, Mint>>,
 
     #[account(mut, address = whirlpool.reward_infos[reward_index as usize].vault)]
-    pub reward_vault: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub reward_vault: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
 
     #[account(address = *reward_mint.to_account_info().owner)]
-    pub reward_token_program: Interface<'info, TokenInterface>,
+    pub reward_token_program: Interface<'info, token_interface::TokenInterface>,
     pub memo_program: Program<'info, Memo>,
     // remaining accounts
     // - accounts for transfer hook program of reward_mint
@@ -952,7 +953,7 @@ pub struct ModifyLiquidityV2<'info> {
         constraint = position_token_account.mint == position.position_mint,
         constraint = position_token_account.amount == 1
     )]
-    pub position_token_account: Box<Account<'info, token::TokenAccount>>,
+    pub position_token_account: Box<Account<'info, TokenAccount>>,
 
     #[account(address = whirlpool.token_mint_a)]
     pub token_mint_a: InterfaceAccount<'info, Mint>,
@@ -960,14 +961,14 @@ pub struct ModifyLiquidityV2<'info> {
     pub token_mint_b: InterfaceAccount<'info, Mint>,
 
     #[account(mut, constraint = token_owner_account_a.mint == whirlpool.token_mint_a)]
-    pub token_owner_account_a: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub token_owner_account_a: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
     #[account(mut, constraint = token_owner_account_b.mint == whirlpool.token_mint_b)]
-    pub token_owner_account_b: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub token_owner_account_b: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
 
     #[account(mut, constraint = token_vault_a.key() == whirlpool.token_vault_a)]
-    pub token_vault_a: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub token_vault_a: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
     #[account(mut, constraint = token_vault_b.key() == whirlpool.token_vault_b)]
-    pub token_vault_b: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub token_vault_b: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
 
     #[account(mut, has_one = whirlpool)]
     pub tick_array_lower: AccountLoader<'info, TickArray>,
@@ -1038,14 +1039,14 @@ pub struct InitializePoolV2<'info> {
       token::token_program = token_program_a,
       token::mint = token_mint_a,
       token::authority = whirlpool)]
-    pub token_vault_a: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub token_vault_a: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
 
     #[account(init,
       payer = funder,
       token::token_program = token_program_b,
       token::mint = token_mint_b,
       token::authority = whirlpool)]
-    pub token_vault_b: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub token_vault_b: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
 
     #[account(has_one = whirlpools_config, constraint = fee_tier.tick_spacing == tick_spacing)]
     pub fee_tier: Account<'info, FeeTier>,
@@ -1083,7 +1084,7 @@ pub struct InitializeRewardV2<'info> {
         token::mint = reward_mint,
         token::authority = whirlpool
     )]
-    pub reward_vault: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub reward_vault: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
 
     #[account(address = *reward_mint.to_account_info().owner)]
     pub reward_token_program: Interface<'info, TokenInterface>,
@@ -1144,7 +1145,7 @@ pub struct SetRewardEmissionsV2<'info> {
     pub reward_authority: Signer<'info>,
 
     #[account(address = whirlpool.reward_infos[reward_index as usize].vault)]
-    pub reward_vault: InterfaceAccount<'info, TokenAccount>,
+    pub reward_vault: InterfaceAccount<'info, token_interface::TokenAccount>,
 }
 
 #[derive(Accounts)]
@@ -1181,14 +1182,14 @@ pub struct SwapV2<'info> {
     pub token_mint_b: InterfaceAccount<'info, Mint>,
 
     #[account(mut, constraint = token_owner_account_a.mint == whirlpool.token_mint_a)]
-    pub token_owner_account_a: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub token_owner_account_a: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
     #[account(mut, address = whirlpool.token_vault_a)]
-    pub token_vault_a: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub token_vault_a: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
 
     #[account(mut, constraint = token_owner_account_b.mint == whirlpool.token_mint_b)]
-    pub token_owner_account_b: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub token_owner_account_b: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
     #[account(mut, address = whirlpool.token_vault_b)]
-    pub token_vault_b: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub token_vault_b: Box<InterfaceAccount<'info, token_interface::TokenAccount>>,
 
     #[account(mut)]
     /// CHECK: checked in the handler
@@ -1209,89 +1210,4 @@ pub struct SwapV2<'info> {
     // - accounts for transfer hook program of token_mint_a
     // - accounts for transfer hook program of token_mint_b
     // - supplemental TickArray accounts
-}
-
-#[derive(Accounts)]
-#[instruction(
-    amount: u64,
-    other_amount_threshold: u64,
-    amount_specified_is_input: bool,
-    a_to_b_one: bool,
-    a_to_b_two: bool,
-)]
-pub struct TwoHopSwapV2<'info> {
-    #[account(mut)]
-    pub whirlpool_one: Box<Account<'info, Whirlpool>>,
-    #[account(mut)]
-    pub whirlpool_two: Box<Account<'info, Whirlpool>>,
-
-    #[account(address = whirlpool_one.input_token_mint(a_to_b_one))]
-    pub token_mint_input: InterfaceAccount<'info, Mint>,
-    #[account(address = whirlpool_one.output_token_mint(a_to_b_one))]
-    pub token_mint_intermediate: InterfaceAccount<'info, Mint>,
-    #[account(address = whirlpool_two.output_token_mint(a_to_b_two))]
-    pub token_mint_output: InterfaceAccount<'info, Mint>,
-
-    #[account(address = *token_mint_input.to_account_info().owner)]
-    pub token_program_input: Interface<'info, TokenInterface>,
-    #[account(address = *token_mint_intermediate.to_account_info().owner)]
-    pub token_program_intermediate: Interface<'info, TokenInterface>,
-    #[account(address = *token_mint_output.to_account_info().owner)]
-    pub token_program_output: Interface<'info, TokenInterface>,
-
-    #[account(mut, constraint = token_owner_account_input.mint == token_mint_input.key())]
-    pub token_owner_account_input: Box<InterfaceAccount<'info, TokenAccount>>,
-    #[account(mut, address = whirlpool_one.input_token_vault(a_to_b_one))]
-    pub token_vault_one_input: Box<InterfaceAccount<'info, TokenAccount>>,
-    #[account(mut, address = whirlpool_one.output_token_vault(a_to_b_one))]
-    pub token_vault_one_intermediate: Box<InterfaceAccount<'info, TokenAccount>>,
-
-    #[account(mut, address = whirlpool_two.input_token_vault(a_to_b_two))]
-    pub token_vault_two_intermediate: Box<InterfaceAccount<'info, TokenAccount>>,
-    #[account(mut, address = whirlpool_two.output_token_vault(a_to_b_two))]
-    pub token_vault_two_output: Box<InterfaceAccount<'info, TokenAccount>>,
-    #[account(mut, constraint = token_owner_account_output.mint == token_mint_output.key())]
-    pub token_owner_account_output: Box<InterfaceAccount<'info, TokenAccount>>,
-
-    pub token_authority: Signer<'info>,
-
-    #[account(mut)]
-    /// CHECK: checked in the handler
-    pub tick_array_one_0: UncheckedAccount<'info>,
-
-    #[account(mut)]
-    /// CHECK: checked in the handler
-    pub tick_array_one_1: UncheckedAccount<'info>,
-
-    #[account(mut)]
-    /// CHECK: checked in the handler
-    pub tick_array_one_2: UncheckedAccount<'info>,
-
-    #[account(mut)]
-    /// CHECK: checked in the handler
-    pub tick_array_two_0: UncheckedAccount<'info>,
-
-    #[account(mut)]
-    /// CHECK: checked in the handler
-    pub tick_array_two_1: UncheckedAccount<'info>,
-
-    #[account(mut)]
-    /// CHECK: checked in the handler
-    pub tick_array_two_2: UncheckedAccount<'info>,
-
-    #[account(mut, seeds = [b"oracle", whirlpool_one.key().as_ref()], bump)]
-    /// CHECK: Oracle is currently unused and will be enabled on subsequent updates
-    pub oracle_one: UncheckedAccount<'info>,
-
-    #[account(mut, seeds = [b"oracle", whirlpool_two.key().as_ref()], bump)]
-    /// CHECK: Oracle is currently unused and will be enabled on subsequent updates
-    pub oracle_two: UncheckedAccount<'info>,
-
-    pub memo_program: Program<'info, Memo>,
-    // remaining accounts
-    // - accounts for transfer hook program of token_mint_input
-    // - accounts for transfer hook program of token_mint_intermediate
-    // - accounts for transfer hook program of token_mint_output
-    // - supplemental TickArray accounts for whirlpool_one
-    // - supplemental TickArray accounts for whirlpool_two
 }
